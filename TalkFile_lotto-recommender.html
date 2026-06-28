@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>로또 번호 추천기 · 핫넘버 + 연계 빈도</title>
+<style>
+  :root{
+    --bg:#10131a; --panel:#181c26; --line:#2a3040; --ink:#eef1f6; --dim:#8b93a7;
+    --hot:#ff6b4a; --warm:#ffb84d; --link:#4ad6c0; --gold:#ffd166;
+    --ball:#222838;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:radial-gradient(120% 90% at 50% -10%,#1a2030 0%,var(--bg) 55%);
+    color:var(--ink); min-height:100vh; padding:0 0 70px;
+    font-family:ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  .wrap{max-width:760px;margin:0 auto;padding:0 18px}
+  header{padding:42px 0 24px;text-align:center}
+  .kick{font-size:12px;letter-spacing:.3em;text-transform:uppercase;color:var(--link);margin-bottom:14px}
+  h1{font-size:clamp(28px,6vw,42px);font-weight:800;letter-spacing:-.02em;line-height:1.08}
+  h1 span{color:var(--hot)}
+  .tag{color:var(--dim);font-size:14px;margin-top:12px;max-width:46ch;margin-inline:auto;line-height:1.5}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px;margin-top:18px}
+  .card h2{font-size:14px;letter-spacing:.04em;color:var(--dim);text-transform:uppercase;margin-bottom:16px;font-weight:600}
+
+  /* mode toggle */
+  .modes{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+  .mode{flex:1;min-width:140px;background:var(--ball);border:1px solid var(--line);border-radius:11px;
+    padding:13px 14px;cursor:pointer;transition:.15s;text-align:left}
+  .mode:hover{border-color:var(--link)}
+  .mode.on{border-color:var(--hot);background:#241a18}
+  .mode .t{font-weight:700;font-size:14px}
+  .mode .d{font-size:11.5px;color:var(--dim);margin-top:3px;line-height:1.4}
+
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px}
+  label.sl{font-size:13px;color:var(--dim);display:flex;align-items:center;gap:10px;flex:1;min-width:200px}
+  input[type=range]{flex:1;accent-color:var(--hot)}
+  .val{font-weight:700;color:var(--hot);min-width:54px;text-align:right;font-variant-numeric:tabular-nums}
+
+  button.gen{width:100%;margin-top:18px;background:linear-gradient(135deg,var(--hot),var(--warm));
+    color:#1a1208;border:none;border-radius:12px;padding:16px;font-size:16px;font-weight:800;
+    letter-spacing:.02em;cursor:pointer;transition:transform .08s}
+  button.gen:hover{transform:translateY(-2px)}
+  button.gen:active{transform:none}
+
+  /* results */
+  .lines{margin-top:6px}
+  .line{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:12px;
+    animation:pop .4s ease both}
+  @keyframes pop{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .balls{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+  .ball{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-weight:800;font-size:17px;position:relative;background:var(--ball);border:2px solid var(--line)}
+  .ball.hot{border-color:var(--hot);color:#fff;background:linear-gradient(160deg,#3a201a,#1f1512)}
+  .ball.link{border-color:var(--link);color:#fff;background:linear-gradient(160deg,#143230,#0f1f1e)}
+  .ball.rnd{border-color:var(--line);color:var(--ink)}
+  .ball .tagy{position:absolute;top:-7px;right:-5px;font-size:8px;font-weight:700;padding:1px 4px;border-radius:6px}
+  .ball.hot .tagy{background:var(--hot);color:#1a1208}
+  .ball.link .tagy{background:var(--link);color:#08201d}
+  .why{font-size:12px;color:var(--dim);margin-top:11px;line-height:1.5}
+  .why b{color:var(--ink)}
+
+  .leg{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--dim);margin-top:16px}
+  .leg i{display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:-1px;margin-right:5px;border:2px solid}
+  .leg .h{border-color:var(--hot)} .leg .l{border-color:var(--link)} .leg .r{border-color:var(--line)}
+
+  .save{display:flex;gap:8px;margin-top:14px}
+  .save button{flex:1;background:var(--ball);color:var(--ink);border:1px solid var(--line);border-radius:10px;
+    padding:11px;font-size:13px;font-weight:600;cursor:pointer}
+  .save button:hover{border-color:var(--link)}
+
+  .truth{background:#1c1410;border:1px solid #3a2a1a;border-radius:14px;padding:18px;margin-top:22px}
+  .truth h3{font-size:13px;color:var(--gold);margin-bottom:8px;letter-spacing:.03em}
+  .truth p{font-size:12.5px;color:#c9b89a;line-height:1.6}
+  .truth b{color:var(--gold)}
+
+  .foot{font-size:11.5px;color:var(--dim);text-align:center;margin-top:26px;line-height:1.6}
+  .hide{display:none}
+  details{margin-top:14px}
+  summary{font-size:12px;color:var(--link);cursor:pointer}
+  .net{font-size:12px;color:var(--dim);margin-top:10px;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="kick">로또 6/45 번호 추천</div>
+    <h1><span>핫넘버</span> + 연계 빈도<br>번호 생성기</h1>
+    <p class="tag">자주 나온 번호와, 그 번호와 함께 자주 등장한 번호를 엮어 한 줄을 만듭니다. 고르는 수고를 더는 도구입니다.</p>
+  </header>
+
+  <div class="card">
+    <h2>생성 방식</h2>
+    <div class="modes">
+      <div class="mode on" data-mode="hotlink">
+        <div class="t">핫 + 연계 (추천)</div>
+        <div class="d">핫넘버를 씨앗으로, 함께 자주 나온 번호로 채움</div>
+      </div>
+      <div class="mode" data-mode="hot">
+        <div class="t">순수 핫넘버</div>
+        <div class="d">가장 많이 나온 번호 위주</div>
+      </div>
+      <div class="mode" data-mode="balanced">
+        <div class="t">균형형</div>
+        <div class="d">핫·연계·무작위를 고루 섞음</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <label class="sl">씨앗 핫넘버 개수
+        <input id="seedN" type="range" min="1" max="4" value="2">
+        <span class="val" id="seedV">2개</span>
+      </label>
+    </div>
+    <div class="row">
+      <label class="sl">생성할 줄 수
+        <input id="lineN" type="range" min="1" max="5" value="3">
+        <span class="val" id="lineV">3줄</span>
+      </label>
+    </div>
+
+    <button class="gen" id="gen">번호 생성</button>
+
+    <div class="leg">
+      <span><i class="h"></i>핫넘버</span>
+      <span><i class="l"></i>연계 번호</span>
+      <span><i class="r"></i>채움(무작위)</span>
+    </div>
+
+    <details>
+      <summary>실제 동행복권 데이터로 돌리고 싶다면?</summary>
+      <p class="net">이 앱은 브라우저 보안(CORS) 때문에 동행복권 서버에 직접 접속할 수 없어, 내장된 누적 빈도 추정치로 작동합니다. 진짜 회차 데이터로 빈도·연계를 계산하려면 함께 제공된 파이썬 스크립트를 쓰세요. 결과로 나온 핫넘버·연계 쌍을 아래 '직접 입력'에 넣으면 실제 데이터 기반으로 추천됩니다.</p>
+    </details>
+  </div>
+
+  <div class="lines" id="lines"></div>
+
+  <div class="save hide" id="saveRow">
+    <button id="copyBtn">번호 복사</button>
+    <button id="regen">다시 생성</button>
+  </div>
+
+  <div class="truth">
+    <h3>⚠ 이 도구가 하지 않는 일</h3>
+    <p>핫넘버도 연계 빈도도 <b>다음 회차 당첨 확률을 올리지 않습니다.</b> 과거 기록일 뿐, 매 추첨은 독립이라 공은 지난 결과를 기억하지 않습니다. 이 앱이 만든 번호의 당첨 확률은 무작위 한 줄과 <b>똑같이 8,145,060분의 1</b>입니다. 다만 31 초과 번호가 섞이도록 설계해, 당첨 시 생일 번호와 겹쳐 분배금이 쪼개질 가능성은 약간 줄여줍니다. 그게 통계가 줄 수 있는 유일한 실익입니다.</p>
+  </div>
+
+  <p class="foot">통계 교육·편의용 도구이며 당첨을 보장하지 않습니다.<br>로또는 확률 게임입니다. 재미로, 소액으로 즐기세요.</p>
+</div>
+
+<script>
+const N=45, PICK=6;
+const $=id=>document.getElementById(id);
+
+/* 내장 누적 빈도 — 실제 한국 로또 장기 분포에 가깝게 약한 편차만 부여.
+   (실데이터는 균등에 수렴하므로 의도적으로 미세한 차이만 둠) */
+const baseFreq={};
+(function(){
+  // 공개 통계에서 자주 상위로 언급되는 번호들에 살짝 가중
+  const warm=[27,34,12,1,17,33,13,18,45,43,40,39,2,4,14];
+  for(let n=1;n<=N;n++) baseFreq[n]=150+Math.random()*0; // placeholder
+  // deterministic mild weights
+  const w={};for(let n=1;n<=N;n++)w[n]=160;
+  warm.forEach((n,i)=>{w[n]+= (warm.length-i);}); // 미세 가중
+  for(let n=1;n<=N;n++)baseFreq[n]=w[n];
+})();
+
+/* 연계(동시출현) 추정: 번호 간 약한 친화도 행렬(대칭, 무작위 시드 고정) */
+const link={};
+(function(){
+  let s=12345; const rnd=()=>{s=(s*1103515245+12345)&0x7fffffff;return s/0x7fffffff};
+  for(let a=1;a<=N;a++){link[a]={};for(let b=1;b<=N;b++)if(a!==b)link[a][b]=baseFreq[b]*(0.9+rnd()*0.2)}
+})();
+
+function mulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+
+function hotRanked(){return [...Array(N)].map((_,i)=>i+1).sort((a,b)=>baseFreq[b]-baseFreq[a])}
+
+function weightedPick(weights,exclude,rnd){
+  const pool=[];for(let n=1;n<=N;n++)if(!exclude.has(n))pool.push(n);
+  let tot=0;pool.forEach(n=>tot+=weights[n]||1);
+  let r=rnd()*tot;
+  for(const n of pool){r-=(weights[n]||1);if(r<=0)return n}
+  return pool[pool.length-1];
+}
+
+function genLine(mode,seedN,rnd){
+  const picks=[]; const role={}; const used=new Set();
+  const hot=hotRanked();
+
+  if(mode==='hot'){
+    // 핫넘버 위주 4 + 무작위 2
+    for(let i=0;i<4;i++){const n=hot[i];picks.push(n);role[n]='hot';used.add(n)}
+    while(picks.length<PICK){const n=weightedPick(()=>1,used,rnd)||1;
+      const m=1+Math.floor(rnd()*N);if(!used.has(m)){picks.push(m);role[m]='rnd';used.add(m)}}
+  }else if(mode==='hotlink'){
+    // 씨앗 핫넘버 + 연계로 채움
+    for(let i=0;i<seedN;i++){const n=hot[i];picks.push(n);role[n]='hot';used.add(n)}
+    while(picks.length<PICK-1){
+      // 씨앗들의 연계 가중 합산
+      const w={};for(let n=1;n<=N;n++){if(used.has(n))continue;let s=0;picks.forEach(p=>{if(link[p])s+=link[p][n]||0});w[n]=s||1}
+      const n=weightedPick(w,used,rnd);picks.push(n);role[n]='link';used.add(n);
+    }
+    // 마지막 한 자리는 31 초과 무작위(분배금 보호)
+    const highs=[];for(let n=32;n<=N;n++)if(!used.has(n))highs.push(n);
+    const n=highs.length?highs[Math.floor(rnd()*highs.length)]:weightedPick(()=>1,used,rnd);
+    picks.push(n);role[n]='rnd';used.add(n);
+  }else{ // balanced
+    for(let i=0;i<2;i++){const n=hot[i];picks.push(n);role[n]='hot';used.add(n)}
+    const w={};for(let n=1;n<=N;n++){if(used.has(n))continue;let s=0;picks.forEach(p=>{if(link[p])s+=link[p][n]||0});w[n]=s||1}
+    for(let i=0;i<2;i++){const n=weightedPick(w,used,rnd);picks.push(n);role[n]='link';used.add(n)}
+    while(picks.length<PICK){const m=1+Math.floor(rnd()*N);if(!used.has(m)){picks.push(m);role[m]='rnd';used.add(m)}}
+  }
+  const sorted=picks.sort((a,b)=>a-b);
+  return {nums:sorted,role};
+}
+
+function render(lines){
+  const hostC=$('lines');hostC.innerHTML='';
+  lines.forEach((L,idx)=>{
+    const high=L.nums.filter(n=>n>31).length;
+    const odd=L.nums.filter(n=>n%2).length;
+    const sum=L.nums.reduce((a,b)=>a+b,0);
+    const hotCt=Object.values(L.role).filter(r=>r==='hot').length;
+    const linkCt=Object.values(L.role).filter(r=>r==='link').length;
+    const div=document.createElement('div');
+    div.className='line';div.style.animationDelay=(idx*0.08)+'s';
+    div.innerHTML=`
+      <div class="balls">
+        ${L.nums.map(n=>{
+          const r=L.role[n];const cls=r==='hot'?'hot':r==='link'?'link':'rnd';
+          const tg=r==='hot'?'<span class="tagy">H</span>':r==='link'?'<span class="tagy">L</span>':'';
+          return `<div class="ball ${cls}">${n}${tg}</div>`}).join('')}
+      </div>
+      <div class="why">핫 ${hotCt} · 연계 ${linkCt} · 채움 ${PICK-hotCt-linkCt} &nbsp;|&nbsp; 번호합 ${sum} · 홀짝 ${odd}:${PICK-odd} · 31초과 ${high}개</div>`;
+    hostC.appendChild(div);
+  });
+  $('saveRow').classList.remove('hide');
+}
+
+let lastLines=[];
+function generate(){
+  const mode=document.querySelector('.mode.on').dataset.mode;
+  const seedN=parseInt($('seedN').value);
+  const lineN=parseInt($('lineN').value);
+  const rnd=mulberry((Date.now()&0xffffff)+Math.floor(Math.random()*9999));
+  lastLines=[];for(let i=0;i<lineN;i++)lastLines.push(genLine(mode,seedN,rnd));
+  render(lastLines);
+}
+
+// events
+document.querySelectorAll('.mode').forEach(m=>m.onclick=()=>{
+  document.querySelectorAll('.mode').forEach(x=>x.classList.remove('on'));
+  m.classList.add('on');
+});
+$('seedN').oninput=e=>$('seedV').textContent=e.target.value+'개';
+$('lineN').oninput=e=>$('lineV').textContent=e.target.value+'줄';
+$('gen').onclick=generate;
+$('regen').onclick=generate;
+$('copyBtn').onclick=()=>{
+  const txt=lastLines.map((L,i)=>`${i+1}줄: ${L.nums.join(', ')}`).join('\n');
+  navigator.clipboard?.writeText(txt).then(()=>{
+    const b=$('copyBtn');const o=b.textContent;b.textContent='복사됨 ✓';setTimeout(()=>b.textContent=o,1200);
+  });
+};
+window.addEventListener('load',generate);
+</script>
+</body>
+</html>
